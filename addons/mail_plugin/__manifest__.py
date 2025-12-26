@@ -17,6 +17,7 @@
         'views/mail_plugin_login.xml',
         'views/res_partner_iap_views.xml',
         'security/ir.model.access.csv',
+        'data/mail_template_data.xml',
     ],
     'installable': True,
     'author': 'Odoo S.A.',

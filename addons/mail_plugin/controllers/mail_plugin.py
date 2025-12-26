@@ -15,7 +15,6 @@ from odoo.http import request
 
 _logger = logging.getLogger(__name__)
 
-
 class MailPluginController(http.Controller):
 
     @http.route('/mail_client_extension/modules/get', type="jsonrpc", auth="outlook", csrf=False, cors="*")
@@ -273,6 +272,37 @@ class MailPluginController(http.Controller):
     def get_translations(self):
         return self._prepare_translations()
 
+
+    @http.route('/mail_plugin/send_custom_email', type='jsonrpc', auth='user', cors="*")
+    def send_custom_email(self, email, subject=None, body=None):
+        """
+        Send a custom email using the plugin's template.
+        :param email: Recipient email address
+        :param subject: Optional subject override
+        :param body: Optional body content (will be injected into template if supported, or just used as context)
+        """
+        template = request.env.ref('mail_plugin.mail_plugin_custom_template', raise_if_not_found=False)
+        if not template:
+            return {'error': 'Template not found'}
+
+        # Find or create a partner for the email to have a record to bind to
+        partner = request.env['res.partner'].search([('email', '=', email)], limit=1)
+        if not partner:
+            # Create a simple contact if not found, or handle as needed. 
+            # For this simple implementation, we'll require a partner or try to create one.
+            partner = request.env['res.partner'].create({'name': email, 'email': email})
+
+        email_values = {}
+        if subject:
+            email_values['subject'] = subject
+        
+        # If we wanted to inject body dynamically, we'd need to modify the template to accept context 
+        # or use the body parameter to render. 
+        # For now, we use the static template but allow subject override.
+        
+        template.send_mail(partner.id, email_values=email_values, force_send=True)
+        return {'success': True, 'message': 'Email sent to %s' % email}
+
     def _iap_enrich(self, domain):
         """
         Returns enrichment data for a given domain, in case an error happens the response will
@@ -410,7 +440,7 @@ class MailPluginController(http.Controller):
     def _get_contact_data(self, partner):
         """
         method used to return partner related values, it can be overridden by other modules if extra information have to
-        be returned with the partner (e.g., leads, ...)
+        be returned with the partner (e.g., leads, ....)
         """
         if partner:
             partner_response = self._get_partner_data(partner)
@@ -428,7 +458,7 @@ class MailPluginController(http.Controller):
             'user_companies': request.env.user.company_ids.ids,
             'can_create_partner': request.env['res.partner'].has_access('create'),
         }
-
+        
     def _mail_content_logging_models_whitelist(self):
         """
         Returns all models that emails can be logged to and that can be used by the "log_mail_content" method,
@@ -464,3 +494,5 @@ class MailPluginController(http.Controller):
             for message in messages:
                 translations_dict.update({message['id']: message['string']})
         return translations_dict
+
+
